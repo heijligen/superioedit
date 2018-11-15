@@ -23,14 +23,15 @@
 #define USAGE "\nUsage: superioedit ...\n\
   modes:\n\
   -E                   | list all enabled devices\n\
+  -I                   | show some infos\n\
   -D <LDN|'all'>       | get values from all registers from (all) devices\n\
   -e <LDN>             | enable device\n\
   -d <LDN>             | disable device\n\
   -g <LDN> <REG>       | get value from register at device\n\
   -s <LDN> <REG> <VAL> | set value to register at device\n\
   flags:\n\
-  -v                   | verbose output\n\
-  -i                   | interactive (y/n) bevor execute\n\n"
+  -v                   | verbose output (not working)\n\
+  -y                   | no interaction, accept input without confirmation (not working)\n\n"
 
 /*
  *
@@ -76,56 +77,60 @@ void enable_confmode (uint16_t port)
 }
 
 
-
 int main(int argc, char **argv)
 {
 	enum {
-		mode_none,
+		mode_none = 0,
 		mode_set,
 		mode_get,
 		mode_dump,
-		mode_list
+		mode_list,
+		mode_info
 	} mode = mode_none;
 
-	int verbose = 0, interactive = 0;
+	int verbose = 0, interactive = 1;
 	int ldn, reg, val;
-	int argi = 1;
-	while ((argi < argc) && (mode == mode_none)) {
+	for (int argi = 1; argi < argc; argi++) {
 		if (!strcmp(argv[argi], "-v")) {
 			verbose = 1;
-		} else if (!strcmp(argv[argi], "-i")) {
-			interactive = 1;
-		} else if (!strcmp(argv[argi], "-s") && ((argc-argi) > 3)) {
+		} else if (!strcmp(argv[argi], "-y")) {
+			interactive = 0;
+		} else if (!mode && !strcmp(argv[argi], "-s") && ((argc-argi) > 3)) {
 			mode = mode_set;
-			ldn = atoi(argv[argi+1]);
-			reg = atoi(argv[argi+2]);
-			val = atoi(argv[argi+3]);
+			ldn = strtoul(argv[argi+1], NULL, 0);
+			reg = strtoul(argv[argi+2], NULL, 0);
+			val = strtoul(argv[argi+3], NULL, 0);
 			argi+=3;
-		} else if (!strcmp(argv[argi], "-g") && ((argc-argi) > 2)) {
+		} else if (!mode && !strcmp(argv[argi], "-g") && ((argc-argi) > 2)) {
 			mode = mode_get;
-			ldn = atoi(argv[argi+1]);
-			reg = atoi(argv[argi+2]);
+			ldn = strtoul(argv[argi+1], NULL, 0);
+			reg = strtoul(argv[argi+2], NULL, 0);
 			argi+=2;
-		}  else if (!strcmp(argv[argi], "-d") && ((argc-argi) > 1)) {
+		}  else if (!mode && !strcmp(argv[argi], "-d") && ((argc-argi) > 1)) {
 			mode = mode_set;
+			ldn = strtoul(argv[argi+1], NULL, 0);
 			reg = DEVICE_ENABLE_REGISTER;
 			val = 0;
-		} else if (!strcmp(argv[argi], "-e") && ((argc-argi) > 1)) {
+			argi+=1;
+		} else if (!mode && !strcmp(argv[argi], "-e") && ((argc-argi) > 1)) {
+			printf("-e\n");
 			mode = mode_set;
-			ldn = atoi(argv[argi+1]);
+			ldn = strtoul(argv[argi+1], NULL, 0);
 			reg = DEVICE_ENABLE_REGISTER;
 			val = 1;
-		} else if (!strcmp(argv[argi], "-D") && ((argc-argi) > 1)) {
-			mode = mode_dump;
-			ldn = atoi(argv[argi+1]);
 			argi+=1;
-		} else if (!strcmp(argv[argi], "-E")) {
+		} else if (!mode && !strcmp(argv[argi], "-D") && ((argc-argi) > 1)) {
+			mode = mode_dump;
+			ldn = strtoul(argv[argi+1], NULL, 0);
+			argi+=1;
+		} else if (!mode && !strcmp(argv[argi], "-E")) {
 			mode = mode_list;
+		} else if (!mode && !strcmp(argv[argi], "-I")) {
+			mode = mode_info;
 		} else {
 			printf(USAGE);
 			return -1;
 		}
-		argi++;
 	}
 	if (mode == mode_none) {
 		printf(USAGE);
@@ -154,9 +159,16 @@ int main(int argc, char **argv)
 			}
 			break;
 		case mode_list:
+			for (int l = 0; l <= 0xff; l++) {
+				val = get(SUPERIO_INDEX_REGISTER, l, DEVICE_ENABLE_REGISTER);
+				if (val)
+					printf("Device 0x%02x enabled\n", l);
+			}
+			break;
+		case mode_info:
+			printf("Not implemented yet :(\n");
 			break;
 	}
 	return 0;
 }
-
 
