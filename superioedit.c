@@ -120,7 +120,6 @@ int main(int argc, char **argv)
 			val = 0;
 			argi+=1;
 		} else if (!mode && !strcmp(argv[argi], "-e") && ((argc-argi) > 1)) {
-			printf("-e\n");
 			mode = mode_set;
 			ldn = strtoul(argv[argi+1], NULL, 0);
 			reg = DEVICE_ENABLE_REGISTER;
@@ -161,15 +160,18 @@ int main(int argc, char **argv)
 			printf("%i\n", get(SUPERIO_INDEX_REGISTER, ldn, reg));
 			break;
 		case mode_dump:
+			printf("device: 0x%02x\n", ldn);
 			for (reg = 0; reg < 0xff; reg++) {
-				 printf("%x %x\n",reg, get(SUPERIO_INDEX_REGISTER, ldn, reg));
+				val = get(SUPERIO_INDEX_REGISTER, ldn, reg);
+				if (val)
+					printf("0x%02x 0x%02x\n",reg, val);
 			}
 			break;
 		case mode_list:
-			for (int l = 0; l <= 0xff; l++) {
-				val = get(SUPERIO_INDEX_REGISTER, l, DEVICE_ENABLE_REGISTER);
+			for (ldn = 0; ldn <= 0xff; ldn++) {
+				val = get(SUPERIO_INDEX_REGISTER, ldn, DEVICE_ENABLE_REGISTER);
 				if (val)
-					printf("Device 0x%02x enabled\n", l);
+					printf("Device 0x%02x enabled\n", ldn);
 			}
 			break;
 		case mode_info:
