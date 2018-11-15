@@ -73,7 +73,14 @@ uint8_t get (uint16_t port, uint8_t ldn, uint8_t reg)
 
 void enable_confmode (uint16_t port)
 {
-	outb (ENABLE_CONFMODE_VALUE, port);
+	/* Thinkpad
+	outb (0x55, port);
+	*/
+	// ITE
+	outb (0x89, port);
+	outb (0x91, port);
+	outb (0x55, port);
+	outb (0x55, port);
 }
 
 
