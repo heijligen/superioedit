@@ -30,7 +30,7 @@
   -g <LDN> <REG>       | get value from register at device\n\
   -s <LDN> <REG> <VAL> | set value to register at device\n\
   flags:\n\
-  -v                   | verbose output (not working)\n\
+  -v                   | verbose outbut (not working)\n\
   -y                   | no interaction, accept input without confirmation (not working)\n\n"
 
 /*
@@ -40,49 +40,47 @@
  */
 
 #define SUPERIO_INDEX_REGISTER 0x2e
-#define SUPERIO_DATA_REGISRER SUPERIO_INDEX_REGISTER+1
+#define SUPERIO_DATA_REGISTER SUPERIO_INDEX_REGISTER+1
 
 #define DEVICE_SELECT_REGISTER 0x07
 #define DEVICE_ENABLE_REGISTER 0x30
 #define DEVICE_VERSION_REGISTER 0x20
 #define DEVICE_REVISION_REGISTER 0x21
 #define ENABLE_CONFMODE_VALUE 0x55
+#define DISABLE_CONFMODE_VALUE 0xaa
 
 
-void select_device (uint16_t port, uint8_t ldn)
+void select_device (uint8_t ldn)
 {
-	outb(DEVICE_SELECT_REGISTER, port);
-	outb(ldn, port+1);
+	outb_p(DEVICE_SELECT_REGISTER, SUPERIO_INDEX_REGISTER);
+	outb_p(ldn, SUPERIO_DATA_REGISTER);
 }
 
-void set (uint16_t port, uint8_t ldn, uint8_t reg, uint8_t val)
+void set (uint8_t reg, uint8_t val)
 {
-	select_device(port, ldn);
-
-	outb(reg, port);
-	outb(val, port+1);
+	outb_p(reg, SUPERIO_INDEX_REGISTER);
+	outb_p(val, SUPERIO_DATA_REGISTER);
 }
 
-uint8_t get (uint16_t port, uint8_t ldn, uint8_t reg)
+uint8_t get (uint8_t reg)
 {
-	select_device(port, ldn);
-	
-	outb(reg, port);
-	return inb(port+1);
+	outb_p(reg, SUPERIO_INDEX_REGISTER);
+	return inb_p(SUPERIO_DATA_REGISTER);
 }
 
-void enable_confmode (uint16_t port)
+void enable_confmode ()
 {
 	/* Thinkpad
-	outb (0x55, port);
+	outb (0x55, SUPERIO_INDEX_REGISTER);
 	*/
 	// ITE
-	outb (0x89, port);
-	outb (0x91, port);
-	outb (0x55, port);
-	outb (0x55, port);
+	outb (0x89, SUPERIO_INDEX_REGISTER);
+	outb (0x91, SUPERIO_INDEX_REGISTER);
+	outb (0x55, SUPERIO_INDEX_REGISTER);
+	outb (0x55, SUPERIO_INDEX_REGISTER);
 }
 
+int parsearg(int argc, char **argv, int mode, ...)
 
 int main(int argc, char **argv)
 {
@@ -95,85 +93,115 @@ int main(int argc, char **argv)
 		mode_info
 	} mode = mode_none;
 
-	int verbose = 0, interactive = 1;
-	int ldn, reg, val;
+	int verbose = 0, interactive = 1, dump_all = 0;
+	int ldn = 0, reg = 0, val = 0;
 	for (int argi = 1; argi < argc; argi++) {
 		if (!strcmp(argv[argi], "-v")) {
 			verbose = 1;
-		} else if (!strcmp(argv[argi], "-y")) {
+		}
+		else if (!strcmp(argv[argi], "-y")) {
 			interactive = 0;
-		} else if (!mode && !strcmp(argv[argi], "-s") && ((argc-argi) > 3)) {
+		}
+		else if (!mode && !strcmp(argv[argi], "-s") && ((argc-argi) > 3)) {
 			mode = mode_set;
 			ldn = strtoul(argv[argi+1], NULL, 0);
 			reg = strtoul(argv[argi+2], NULL, 0);
 			val = strtoul(argv[argi+3], NULL, 0);
 			argi+=3;
-		} else if (!mode && !strcmp(argv[argi], "-g") && ((argc-argi) > 2)) {
+		}
+		else if (!mode && !strcmp(argv[argi], "-g") && ((argc-argi) > 2)) {
 			mode = mode_get;
 			ldn = strtoul(argv[argi+1], NULL, 0);
 			reg = strtoul(argv[argi+2], NULL, 0);
 			argi+=2;
-		}  else if (!mode && !strcmp(argv[argi], "-d") && ((argc-argi) > 1)) {
+		}
+		else if (!mode && !strcmp(argv[argi], "-d") && ((argc-argi) > 1)) {
 			mode = mode_set;
 			ldn = strtoul(argv[argi+1], NULL, 0);
 			reg = DEVICE_ENABLE_REGISTER;
 			val = 0;
 			argi+=1;
-		} else if (!mode && !strcmp(argv[argi], "-e") && ((argc-argi) > 1)) {
+		}
+		else if (!mode && !strcmp(argv[argi], "-e") && ((argc-argi) > 1)) {
 			mode = mode_set;
 			ldn = strtoul(argv[argi+1], NULL, 0);
 			reg = DEVICE_ENABLE_REGISTER;
 			val = 1;
 			argi+=1;
-		} else if (!mode && !strcmp(argv[argi], "-D") && ((argc-argi) > 1)) {
+		}
+		else if (!mode && !strcmp(argv[argi], "-D") && ((argc-argi) > 1)) {
 			mode = mode_dump;
-			ldn = strtoul(argv[argi+1], NULL, 0);
+			if (!strcmp(argv[argi+1], "all")) {
+				dump_all = 1;
+				ldn = 0;
+				printf("dump_all\n");
+			} else 
+				ldn = strtoul(argv[argi+1], NULL, 0);
+			reg = 0;
 			argi+=1;
-		} else if (!mode && !strcmp(argv[argi], "-E")) {
+		}
+		else if (!mode && !strcmp(argv[argi], "-E")) {
 			mode = mode_list;
-		} else if (!mode && !strcmp(argv[argi], "-I")) {
+		}
+		else if (!mode && !strcmp(argv[argi], "-I")) {
 			mode = mode_info;
-		} else {
+		}
+		else {
 			printf(USAGE);
 			return -1;
 		}
 	}
+
 	if (mode == mode_none) {
 		printf(USAGE);
 		return -1;
 	}
 
 	// setup hardware
-	if (ioperm(SUPERIO_INDEX_REGISTER, 2, 1)) {	
+	if (iopl(3)) {
 		printf("tool need to run as root\n");
 		return -1;
 	}
-	enable_confmode(SUPERIO_INDEX_REGISTER);
+	enable_confmode();
 	
-	printf("ldn: %i, reg: %i, val: %i\n", ldn, reg, val);
-
 	switch(mode) {
 		case mode_set:
-			set(SUPERIO_INDEX_REGISTER, ldn, reg, val);
+			select_device(ldn);
+			set(reg, val);
 			break;
+
 		case mode_get:
-			printf("%i\n", get(SUPERIO_INDEX_REGISTER, ldn, reg));
+			select_device(ldn);
+			val = get(reg);
+			printf("0x%02x\n", val);
 			break;
+
 		case mode_dump:
-			printf("device: 0x%02x\n", ldn);
-			for (reg = 0; reg < 0xff; reg++) {
-				val = get(SUPERIO_INDEX_REGISTER, ldn, reg);
-				if (val)
-					printf("0x%02x 0x%02x\n",reg, val);
-			}
+			do {
+				select_device(ldn);
+				printf("Device 0x%02x\n", ldn);
+				
+				for (reg = 0x00; reg <= 0xff; reg++) {
+					if (reg == DISABLE_CONFMODE_VALUE)
+						continue;
+					val = get(reg);
+					if (val)
+						printf("\treg: 0x%02x, val: 0x%02x\n", reg, val);
+				}
+				ldn++;
+			} while (ldn < (dump_all ? 0x100 : ldn));
+
 			break;
+
 		case mode_list:
 			for (ldn = 0; ldn <= 0xff; ldn++) {
-				val = get(SUPERIO_INDEX_REGISTER, ldn, DEVICE_ENABLE_REGISTER);
+				select_device(ldn);
+				val = get(DEVICE_ENABLE_REGISTER);
 				if (val)
 					printf("Device 0x%02x enabled\n", ldn);
 			}
 			break;
+
 		case mode_info:
 			printf("Not implemented yet :(\n");
 			break;
