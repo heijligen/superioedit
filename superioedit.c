@@ -80,7 +80,6 @@ void enable_confmode ()
 	outb (0x55, SUPERIO_INDEX_REGISTER);
 }
 
-int parsearg(int argc, char **argv, int mode, ...)
 
 int main(int argc, char **argv)
 {
